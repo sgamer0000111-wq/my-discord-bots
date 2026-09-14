@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import os
 import discord
 from discord.ext import commands
 
@@ -16,22 +17,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MultiBotRunner")
 
-# List of configured bots
+def clean_token(val: str) -> str:
+    if not val:
+        return ""
+    val = val.strip().strip("'\"")
+    if "Value:" in val:
+        val = val.split("Value:")[-1]
+    if "|" in val:
+        val = val.split("|")[-1]
+    return val.strip()
+
+# List of configured bots with Environment Variable support
 BOTS_CONFIG = [
     {
         "name": "X CHEAT SILENT MAX",
-        "token": "MTQwMjEyNTYwMDgwOTgxNjA3NA.Gj976k.qzvJnn3Ik4sBM3l7npbTFmxWsX660UBe8Ibgc0",
-        "seller_key": "bot_br_live_8c874050bd20af61e0126617"
+        "token": clean_token(os.environ.get("BOT1_TOKEN", "MTQwMjEyNTYwMDgwOTgxNjA3NA.GW8Kwr.uGgOzkSRPwiqD4idBBnvbbDsUfVUobgRJFOHtU")),
+        "seller_key": clean_token(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
     },
     {
         "name": "X CHEAT COVER SILENT",
-        "token": "MTU0ODIwOTg0MTE5MTc4ODU3NA.GzE6DL.Q_cFC2uH50bJm8lEgeeV0lxtuBpOa7WauqFX-Q",
-        "seller_key": "bot_br_live_1017ee6a4b8ea826564f58f4"
+        "token": clean_token(os.environ.get("BOT2_TOKEN", "MTU0ODIwOTg0MTE5MTc4ODU3NA.G034-X.Gpr4v4MP2QYWcz0c50kzljD48BwuhsbClRz43E")),
+        "seller_key": clean_token(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
     },
     {
         "name": "X CHEAT INTERNAL",
-        "token": "MTU0ODIxMjg4NDg0MzI3NDI0MA.G4k4S9.yNLPRHdU0BS28jHwYz_1q0qlirTjltwoF0-PJ0",
-        "seller_key": "bot_br_live_ea8e146eeeb0e3f97192aa9c"
+        "token": clean_token(os.environ.get("BOT3_TOKEN", "MTU0ODIxMjg4NDg0MzI3NDI0MA.G8LnNC.pmNr79OANMAqagrzH8K4Y2XQz0IDbLvdyXAm8c")),
+        "seller_key": clean_token(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
     }
 ]
 
@@ -113,7 +124,6 @@ def create_bot_instance(bot_info: dict):
     return bot, token
 
 
-import os
 from aiohttp import web
 
 async def start_web_health_server():
