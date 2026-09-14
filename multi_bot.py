@@ -17,32 +17,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MultiBotRunner")
 
-def clean_token(val: str) -> str:
+def get_token(env_var: str, default_token: str) -> str:
+    val = os.environ.get(env_var, "").strip()
     if not val:
-        return ""
-    val = val.strip().strip("'\"")
+        return default_token
     if "Value:" in val:
         val = val.split("Value:")[-1]
     if "|" in val:
         val = val.split("|")[-1]
-    return val.strip()
+    val = val.strip().strip("'\"")
+    return val if val else default_token
 
 # List of configured bots with Environment Variable support
 BOTS_CONFIG = [
     {
         "name": "X CHEAT SILENT MAX",
-        "token": clean_token(os.environ.get("BOT1_TOKEN", "MTQwMjEyNTYwMDgwOTgxNjA3NA.GW8Kwr.uGgOzkSRPwiqD4idBBnvbbDsUfVUobgRJFOHtU")),
-        "seller_key": clean_token(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
+        "token": get_token("BOT1_TOKEN", "MTQwMjEyNTYwMDgwOTgxNjA3NA.GW8Kwr.uGgOzkSRPwiqD4idBBnvbbDsUfVUobgRJFOHtU"),
+        "seller_key": get_token("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617")
     },
     {
         "name": "X CHEAT COVER SILENT",
-        "token": clean_token(os.environ.get("BOT2_TOKEN", "MTU0ODIwOTg0MTE5MTc4ODU3NA.G034-X.Gpr4v4MP2QYWcz0c50kzljD48BwuhsbClRz43E")),
-        "seller_key": clean_token(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
+        "token": get_token("BOT2_TOKEN", "MTU0ODIwOTg0MTE5MTc4ODU3NA.G034-X.Gpr4v4MP2QYWcz0c50kzljD48BwuhsbClRz43E"),
+        "seller_key": get_token("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4")
     },
     {
         "name": "X CHEAT INTERNAL",
-        "token": clean_token(os.environ.get("BOT3_TOKEN", "MTU0ODIxMjg4NDg0MzI3NDI0MA.G8LnNC.pmNr79OANMAqagrzH8K4Y2XQz0IDbLvdyXAm8c")),
-        "seller_key": clean_token(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
+        "token": get_token("BOT3_TOKEN", "MTU0ODIxMjg4NDg0MzI3NDI0MA.G8LnNC.pmNr79OANMAqagrzH8K4Y2XQz0IDbLvdyXAm8c"),
+        "seller_key": get_token("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c")
     }
 ]
 
