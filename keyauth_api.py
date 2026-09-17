@@ -19,7 +19,8 @@ class KeyAuthSellerAPI:
         mask: str = "XXXXXX-XXXXXX-XXXXXX-XXXXXX",
         level: int = 1,
         amount: int = 1,
-        note: str = ""
+        note: str = "",
+        prefix: str = "XCHEAT"
     ) -> Dict[str, Any]:
         """
         Generates license key(s) from BR Auth Web Panel API.
@@ -29,11 +30,18 @@ class KeyAuthSellerAPI:
             "Content-Type": "application/json"
         }
 
+        import random
+        import string
+
+        # If prefix is BR, empty, or RANDOM, generate random 4-character prefix
+        if not prefix or prefix.upper() in ("XCHEAT", "RANDOM", "RND"):
+            prefix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+
         # BR Auth bot endpoint payload
         payload = {
             "duration_days": expiry,
             "quantity": amount,
-            "prefix": "BR",
+            "prefix": prefix,
             "hwid_lock": True,
             "notes": note or "Discord Bot Generated"
         }

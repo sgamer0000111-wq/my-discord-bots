@@ -64,15 +64,17 @@ def create_bot_instance(bot_info: dict):
     async def on_ready():
         logger.info(f"[{name}] Logged in as {bot.user} (ID: {bot.user.id})")
         try:
-            synced_global = await bot.tree.sync()
-            logger.info(f"[{name}] Synced {len(synced_global)} global slash command(s).")
+            # Clear per-guild commands to eliminate duplicate slash command entries in Discord
             for guild in bot.guilds:
                 try:
-                    bot.tree.copy_global_to(guild=guild)
-                    synced_guild = await bot.tree.sync(guild=guild)
-                    logger.info(f"[{name}] Synced {len(synced_guild)} command(s) to server: {guild.name}")
-                except Exception as ge:
-                    logger.warning(f"[{name}] Guild sync error: {ge}")
+                    bot.tree.clear_commands(guild=guild)
+                    await bot.tree.sync(guild=guild)
+                except Exception:
+                    pass
+
+            # Sync Global commands clean
+            synced_global = await bot.tree.sync()
+            logger.info(f"[{name}] Synced {len(synced_global)} global slash command(s).")
         except Exception as e:
             logger.error(f"[{name}] Sync error: {e}")
 
