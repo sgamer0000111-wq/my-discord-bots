@@ -4,10 +4,14 @@ import sys
 import os
 import discord
 from discord.ext import commands
+from dotenv import load_dotenv
 
 import config
 from keyauth_api import KeyAuthSellerAPI
 from bot import create_embed, has_bot_access, check_user_access, DAYS_CHOICES, _handle_genkey, ControlPanelView
+
+# Load .env file
+load_dotenv()
 
 # Logging configuration
 logging.basicConfig(
@@ -17,33 +21,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MultiBotRunner")
 
-def get_token(env_var: str, default_token: str) -> str:
-    val = os.environ.get(env_var, "").strip()
+def clean_val(val: str) -> str:
     if not val:
-        return default_token
+        return ""
+    val = val.strip().strip("'\"")
     if "Value:" in val:
         val = val.split("Value:")[-1]
     if "|" in val:
         val = val.split("|")[-1]
-    val = val.strip().strip("'\"")
-    return val if val else default_token
+    return val.strip()
 
 # List of configured bots with Environment Variable support
 BOTS_CONFIG = [
     {
         "name": "X CHEAT SILENT MAX",
-        "token": get_token("BOT1_TOKEN", "MTQwMjEyNTYwMDgwOTgxNjA3NA.GW8Kwr.uGgOzkSRPwiqD4idBBnvbbDsUfVUobgRJFOHtU"),
-        "seller_key": get_token("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617")
+        "token": clean_val(os.environ.get("BOT1_TOKEN", "")),
+        "seller_key": clean_val(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
     },
     {
         "name": "X CHEAT COVER SILENT",
-        "token": get_token("BOT2_TOKEN", "MTU0ODIwOTg0MTE5MTc4ODU3NA.G034-X.Gpr4v4MP2QYWcz0c50kzljD48BwuhsbClRz43E"),
-        "seller_key": get_token("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4")
+        "token": clean_val(os.environ.get("BOT2_TOKEN", "")),
+        "seller_key": clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
     },
     {
         "name": "X CHEAT INTERNAL",
-        "token": get_token("BOT3_TOKEN", "MTU0ODIxMjg4NDg0MzI3NDI0MA.G8LnNC.pmNr79OANMAqagrzH8K4Y2XQz0IDbLvdyXAm8c"),
-        "seller_key": get_token("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c")
+        "token": clean_val(os.environ.get("BOT3_TOKEN", "")),
+        "seller_key": clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
     }
 ]
 
@@ -83,17 +86,19 @@ def create_bot_instance(bot_info: dict):
     # Slash command setup
     @bot.tree.command(name="createkey", description=f"Create key via {name}")
     @discord.app_commands.describe(
-        days="Select Duration (1 Day, 7 Days, 30 Days, Lifetime)"
+        days="Select Duration (1 Day, 7 Days, 30 Days, Lifetime)",
+        prefix="Key Prefix (Default: XCHEAT, e.g. VIP, MYBRAND)"
     )
     @discord.app_commands.choices(days=DAYS_CHOICES)
     @has_bot_access()
     async def createkey(
         interaction: discord.Interaction,
-        days: discord.app_commands.Choice[int]
+        days: discord.app_commands.Choice[int],
+        prefix: str = "XCHEAT"
     ):
         await interaction.response.defer(ephemeral=False)
         note_str = f"Created via Discord by {interaction.user}"
-        res = await api_client.add_key(expiry=days.value, mask="XXXXXX-XXXXXX-XXXXXX", level=1, amount=1, note=note_str)
+        res = await api_client.add_key(expiry=days.value, mask="XXXXXX-XXXXXX-XXXXXX", level=1, amount=1, note=note_str, prefix=prefix)
 
         if res.get("success"):
             key_data = res.get("key") or res.get("keys") or res.get("message")
@@ -144,6 +149,26 @@ async def start_web_health_server():
     logger.info(f"Health check HTTP server running on port {port}")
 
 
+async def self_ping_keep_alive():
+    await asyncio.sleep(10)
+    render_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+    port = os.environ.get("PORT", "8080")
+    urls_to_ping = ["http://127.0.0.1:" + str(port) + "/health"]
+    if render_url:
+        urls_to_ping.append(render_url.rstrip("/") + "/health")
+    
+    import aiohttp
+    async with aiohttp.ClientSession() as session:
+        while True:
+            await asyncio.sleep(240)  # Ping every 4 minutes to stay awake
+            for u in urls_to_ping:
+                try:
+                    async with session.get(u, timeout=10) as resp:
+                        pass
+                except Exception:
+                    pass
+
+
 async def main():
     logger.info("Starting Multi-Bot Runner for all 3 Discord Bots...")
     
@@ -153,12 +178,21 @@ async def main():
     except Exception as e:
         logger.warning(f"Could not start web server: {e}")
 
+    # Launch background keep-alive self ping loop
+    asyncio.create_task(self_ping_keep_alive())
+
     tasks = []
     for b_config in BOTS_CONFIG:
+        if not b_config["token"]:
+            logger.error(f"Missing token for {b_config['name']}. Please set Environment Variable.")
+            continue
         bot_obj, token = create_bot_instance(b_config)
         tasks.append(bot_obj.start(token))
 
-    await asyncio.gather(*tasks)
+    if tasks:
+        await asyncio.gather(*tasks)
+    else:
+        logger.error("No bot tokens configured. Exiting.")
 
 if __name__ == "__main__":
     try:
