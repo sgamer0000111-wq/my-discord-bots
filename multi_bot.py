@@ -51,6 +51,27 @@ BOTS_CONFIG = [
 ]
 
 
+def get_seller_key_for_bot(bot_user, fallback_key: str) -> str:
+    if not bot_user:
+        return fallback_key
+    bot_id = getattr(bot_user, "id", 0)
+    if bot_id == 1402125600809816074:
+        return clean_val(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
+    elif bot_id == 1548209841191788574:
+        return clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
+    elif bot_id == 1548212884843274240:
+        return clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
+
+    uname = getattr(bot_user, "name", "").upper()
+    if "INTERNAL" in uname:
+        return clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
+    elif "COVER" in uname:
+        return clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
+    elif "SILENT" in uname or "MAX" in uname:
+        return clean_val(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
+    return fallback_key
+
+
 def create_bot_instance(bot_info: dict):
     token = bot_info["token"]
     name = bot_info["name"]
@@ -58,7 +79,6 @@ def create_bot_instance(bot_info: dict):
 
     intents = discord.Intents.default()
     bot = commands.Bot(command_prefix="!", intents=intents)
-    api_client = KeyAuthSellerAPI(seller_key=seller_key, api_url=config.KEYAUTH_API_URL)
 
     @bot.event
     async def on_ready():
@@ -81,12 +101,12 @@ def create_bot_instance(bot_info: dict):
         await bot.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name=f"{name} | /createkey"
+                name=f"{bot.user.name if bot.user else name} | /createkey"
             )
         )
 
     # Slash command setup
-    @bot.tree.command(name="createkey", description=f"Create key via {name}")
+    @bot.tree.command(name="createkey", description=f"Create key via bot")
     @discord.app_commands.describe(
         days="Select Duration (1 Day, 7 Days, 30 Days, Lifetime)",
         prefix="Key Prefix (Default: XCHEAT, e.g. VIP, MYBRAND)"
@@ -100,7 +120,9 @@ def create_bot_instance(bot_info: dict):
     ):
         await interaction.response.defer(ephemeral=False)
         note_str = f"Created via Discord by {interaction.user}"
-        res = await api_client.add_key(expiry=days.value, mask="XXXXXX-XXXXXX-XXXXXX", level=1, amount=1, note=note_str, prefix=prefix)
+        active_seller_key = get_seller_key_for_bot(interaction.client.user, seller_key)
+        active_api_client = KeyAuthSellerAPI(seller_key=active_seller_key, api_url=config.KEYAUTH_API_URL)
+        res = await active_api_client.add_key(expiry=days.value, mask="XXXXXX-XXXXXX-XXXXXX", level=1, amount=1, note=note_str, prefix=prefix)
 
         if res.get("success"):
             key_data = res.get("key") or res.get("keys") or res.get("message")
