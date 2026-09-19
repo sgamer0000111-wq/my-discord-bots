@@ -104,7 +104,9 @@ def create_bot_instance(bot_info: dict):
 
         if res.get("success"):
             key_data = res.get("key") or res.get("keys") or res.get("message")
-            embed = create_embed(title=f"🔑 {name} License Key Created!", color=discord.Color.green())
+            bot_display_name = interaction.client.user.name if interaction.client.user else name
+            embed = create_embed(title=f"🔑 {bot_display_name} License Key Created!", color=discord.Color.green())
+            embed.set_footer(text=f"{bot_display_name} • BR AUTH Manager", icon_url="https://br-auth-all-panels.vercel.app/favicon.ico")
             if isinstance(key_data, list):
                 embed.add_field(name="Generated Keys", value="\n".join([f"`{k}`" for k in key_data]), inline=False)
             else:
