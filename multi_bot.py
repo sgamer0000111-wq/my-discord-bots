@@ -181,7 +181,7 @@ def create_bot_instance(bot_info: dict):
     # 24/7 Voice Channel Commands
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
-    async def joinvc(interaction: discord.Interaction, channel: Optional[Union[discord.VoiceChannel, discord.StageChannel]] = None):
+    async def joinvc(interaction: discord.Interaction, channel: Optional[discord.abc.GuildChannel] = None):
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer(ephemeral=False)
@@ -197,7 +197,13 @@ def create_bot_instance(bot_info: dict):
             await interaction.followup.send(embed=embed, ephemeral=False)
             return
 
-        target_channel = channel
+        target_channel = None
+
+        if channel and interaction.guild:
+            resolved = interaction.guild.get_channel(channel.id)
+            if isinstance(resolved, (discord.VoiceChannel, discord.StageChannel)):
+                target_channel = resolved
+
         if not target_channel:
             if isinstance(interaction.user, discord.Member) and interaction.user.voice:
                 target_channel = interaction.user.voice.channel
