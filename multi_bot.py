@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from typing import Optional
 import config
 from keyauth_api import KeyAuthSellerAPI
 from bot import create_embed, has_bot_access, check_user_access, DAYS_CHOICES, _handle_genkey, ControlPanelView
@@ -152,6 +153,85 @@ def create_bot_instance(bot_info: dict):
             color=discord.Color.dark_theme()
         )
         await interaction.response.send_message(embed=embed, view=ControlPanelView(), ephemeral=False)
+
+    # 24/7 Voice Channel Commands
+    @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
+    @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
+    @has_bot_access()
+    async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
+        await interaction.response.defer(ephemeral=False)
+        target_channel = channel
+
+        if not target_channel:
+            if isinstance(interaction.user, discord.Member) and interaction.user.voice:
+                target_channel = interaction.user.voice.channel
+
+        if not target_channel:
+            embed = create_embed(
+                title="❌ Voice Channel Not Found",
+                description="Kripya voice channel me join hokar command chalayein ya `channel` select karein.",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            return
+
+        try:
+            guild = interaction.guild
+            voice_client = guild.voice_client
+
+            if voice_client:
+                if voice_client.channel.id == target_channel.id:
+                    embed = create_embed(
+                        title="🔊 Already Connected in VC",
+                        description=f"Bot already **{target_channel.mention}** me connected hai (24/7 Mode).",
+                        color=discord.Color.blue()
+                    )
+                    await interaction.followup.send(embed=embed, ephemeral=False)
+                    return
+                else:
+                    await voice_client.move_to(target_channel)
+            else:
+                await target_channel.connect(reconnect=True, self_deaf=True)
+
+            bot_display_name = interaction.client.user.name if interaction.client.user else name
+            embed = create_embed(
+                title=f"🔊 {bot_display_name} Joined Voice Channel!",
+                description=f"Bot successfully **{target_channel.mention}** me join ho gaya hai aur **24/7** connected rahega!",
+                color=discord.Color.green()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+        except Exception as e:
+            embed = create_embed(
+                title="❌ VC Join Failed",
+                description=f"Voice channel join karte waqt error aaya: `{str(e)}`",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+
+    @bot.tree.command(name="leavevc", description=f"Disconnect {name} from Voice Channel")
+    @has_bot_access()
+    async def leavevc(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        guild = interaction.guild
+        voice_client = guild.voice_client
+
+        if voice_client:
+            vc_name = voice_client.channel.name
+            await voice_client.disconnect(force=True)
+            bot_display_name = interaction.client.user.name if interaction.client.user else name
+            embed = create_embed(
+                title=f"🔇 {bot_display_name} Disconnected",
+                description=f"Bot **{vc_name}** Voice Channel se disconnect ho gaya hai.",
+                color=discord.Color.gold()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+        else:
+            embed = create_embed(
+                title="❌ Not in Voice Channel",
+                description="Bot filhal kisi Voice Channel me connected nahi hai.",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
 
     return bot, token
 
