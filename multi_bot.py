@@ -154,14 +154,50 @@ def create_bot_instance(bot_info: dict):
         )
         await interaction.response.send_message(embed=embed, view=ControlPanelView(), ephemeral=False)
 
+    # Tree error handler for permission checks and command failures
+    @bot.tree.error
+    async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        if isinstance(error, (discord.app_commands.MissingPermissions, discord.app_commands.CheckFailure)):
+            embed = create_embed(
+                title="⛔ Permission Denied",
+                description="Is command ko chalane ke liye aapke paas **`BOT ACCESS`** Role ya Administrator permission honi chahiye.",
+                color=discord.Color.red()
+            )
+        else:
+            logger.error(f"[{name}] Command error: {error}")
+            embed = create_embed(
+                title="⚠️ Command Error",
+                description=f"Command execute karte waqt error aaya: `{str(error)}`",
+                color=discord.Color.gold()
+            )
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=embed, ephemeral=False)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=False)
+        except Exception:
+            pass
+
     # 24/7 Voice Channel Commands
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
-    @has_bot_access()
     async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
-        await interaction.response.defer(ephemeral=False)
-        target_channel = channel
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
 
+        if not check_user_access(interaction):
+            embed = create_embed(
+                title="⛔ Permission Denied",
+                description="Is command ko chalane ke liye aapke paas **`BOT ACCESS`** Role ya Administrator permission honi chahiye.",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            return
+
+        target_channel = channel
         if not target_channel:
             if isinstance(interaction.user, discord.Member) and interaction.user.voice:
                 target_channel = interaction.user.voice.channel
@@ -169,7 +205,7 @@ def create_bot_instance(bot_info: dict):
         if not target_channel:
             embed = create_embed(
                 title="❌ Voice Channel Not Found",
-                description="Kripya voice channel me join hokar command chalayein ya `channel` select karein.",
+                description="Kripya pehle kisi Voice Channel me join hon ya command me `channel` select karein.",
                 color=discord.Color.red()
             )
             await interaction.followup.send(embed=embed, ephemeral=False)
@@ -177,10 +213,14 @@ def create_bot_instance(bot_info: dict):
 
         try:
             guild = interaction.guild
-            voice_client = guild.voice_client
+            if not guild:
+                embed = create_embed(title="❌ Server Only", description="Is command ko server me chalayein.", color=discord.Color.red())
+                await interaction.followup.send(embed=embed, ephemeral=False)
+                return
 
+            voice_client = guild.voice_client
             if voice_client:
-                if voice_client.channel.id == target_channel.id:
+                if voice_client.channel and voice_client.channel.id == target_channel.id:
                     embed = create_embed(
                         title="🔊 Already Connected in VC",
                         description=f"Bot already **{target_channel.mention}** me connected hai (24/7 Mode).",
@@ -203,20 +243,33 @@ def create_bot_instance(bot_info: dict):
         except Exception as e:
             embed = create_embed(
                 title="❌ VC Join Failed",
-                description=f"Voice channel join karte waqt error aaya: `{str(e)}`",
+                description=f"Voice channel join karte waqt error aaya: `{str(e)}`\nMake sure bot has `Connect` & `Speak` permissions in VC!",
                 color=discord.Color.red()
             )
             await interaction.followup.send(embed=embed, ephemeral=False)
 
     @bot.tree.command(name="leavevc", description=f"Disconnect {name} from Voice Channel")
-    @has_bot_access()
     async def leavevc(interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=False)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
+
+        if not check_user_access(interaction):
+            embed = create_embed(
+                title="⛔ Permission Denied",
+                description="Is command ko chalane ke liye aapke paas **`BOT ACCESS`** Role ya Administrator permission honi chahiye.",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            return
+
         guild = interaction.guild
-        voice_client = guild.voice_client
+        voice_client = guild.voice_client if guild else None
 
         if voice_client:
-            vc_name = voice_client.channel.name
+            vc_name = voice_client.channel.name if voice_client.channel else "VC"
             await voice_client.disconnect(force=True)
             bot_display_name = interaction.client.user.name if interaction.client.user else name
             embed = create_embed(
