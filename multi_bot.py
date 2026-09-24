@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from typing import Optional
+from typing import Optional, Union
 import config
 from keyauth_api import KeyAuthSellerAPI
 from bot import create_embed, has_bot_access, check_user_access, DAYS_CHOICES, _handle_genkey, ControlPanelView
@@ -181,7 +181,7 @@ def create_bot_instance(bot_info: dict):
     # 24/7 Voice Channel Commands
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
-    async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
+    async def joinvc(interaction: discord.Interaction, channel: Optional[Union[discord.VoiceChannel, discord.StageChannel]] = None):
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer(ephemeral=False)
