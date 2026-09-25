@@ -84,19 +84,34 @@ SPEECH_LOCK = asyncio.Lock()
 
 def ensure_tts_audio_files():
     try:
-        from gtts import gTTS
-        files_to_create = [
-            ("audio_internal.mp3", "Welcome sir, how can I help you?"),
-            ("audio_cover.mp3", "Should I call any staff?"),
-            ("audio_silent.mp3", "If you want to buy anything, I can call the owner."),
-        ]
-        for fname, text in files_to_create:
-            if not os.path.exists(fname):
-                tts = gTTS(text=text, lang="en")
-                tts.save(fname)
-                logger.info(f"Generated TTS audio file: {fname}")
-    except Exception as e:
-        logger.warning(f"Could not generate TTS files: {e}")
+        if not os.path.exists("audio_internal.mp3") or not os.path.exists("audio_cover.mp3") or not os.path.exists("audio_silent.mp3"):
+            import edge_tts
+            async def _gen():
+                if not os.path.exists("audio_internal.mp3"):
+                    await edge_tts.Communicate("Welcome sir, how can I help you?", "en-US-AvaNeural").save("audio_internal.mp3")
+                if not os.path.exists("audio_cover.mp3"):
+                    await edge_tts.Communicate("Should I call any staff?", "en-US-EmmaNeural").save("audio_cover.mp3")
+                if not os.path.exists("audio_silent.mp3"):
+                    await edge_tts.Communicate("If you want to buy anything, I can call the owner.", "en-GB-SoniaNeural").save("audio_silent.mp3")
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(_gen())
+                else:
+                    asyncio.run(_gen())
+            except Exception:
+                asyncio.run(_gen())
+    except Exception:
+        try:
+            from gtts import gTTS
+            if not os.path.exists("audio_internal.mp3"):
+                gTTS("Welcome sir, how can I help you?", lang="en", tld="co.uk").save("audio_internal.mp3")
+            if not os.path.exists("audio_cover.mp3"):
+                gTTS("Should I call any staff?", lang="en", tld="co.uk").save("audio_cover.mp3")
+            if not os.path.exists("audio_silent.mp3"):
+                gTTS("If you want to buy anything, I can call the owner.", lang="en", tld="co.uk").save("audio_silent.mp3")
+        except Exception as e:
+            logger.warning(f"Could not generate TTS files: {e}")
 
 async def play_audio_file(bot_user_id: int, guild: discord.Guild, audio_file: str):
     if not os.path.exists(audio_file):
@@ -126,22 +141,20 @@ async def play_audio_file(bot_user_id: int, guild: discord.Guild, audio_file: st
     except Exception as ex:
         logger.warning(f"Audio playback error for bot {bot_user_id}: {ex}")
 
-async def handle_vc_welcome_sequence(member: discord.Member, channel: discord.VoiceChannel):
+async def handle_vc_welcome_sequence(guild: discord.Guild, channel: discord.VoiceChannel):
     async with SPEECH_LOCK:
-        if not member.voice or member.voice.channel.id != channel.id:
-            return
-        
+        logger.info(f"Triggering Girl Voice Welcome Dialogue in VC: {channel.name}")
         ensure_tts_audio_files()
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.6)
 
         # 1. Bot 3 (X CHEAT INTERNAL) speaks: "Welcome sir, how can I help you?"
-        await play_audio_file(1548212884843274240, member.guild, "audio_internal.mp3")
+        await play_audio_file(1548212884843274240, guild, "audio_internal.mp3")
 
         # 2. Bot 2 (X CHEAT COVER SILENT) speaks: "Should I call any staff?"
-        await play_audio_file(1548209841191788574, member.guild, "audio_cover.mp3")
+        await play_audio_file(1548209841191788574, guild, "audio_cover.mp3")
 
         # 3. Bot 1 (X CHEAT SILENT MAX) speaks: "If you want to buy anything, I can call the owner."
-        await play_audio_file(1402125600809816074, member.guild, "audio_silent.mp3")
+        await play_audio_file(1402125600809816074, guild, "audio_silent.mp3")
 
 
 async def vc_auto_reconnect_loop(bot, bot_name: str):
@@ -217,7 +230,7 @@ def create_bot_instance(bot_info: dict):
                 GLOBAL_BOT_INSTANCES[bot.user.id] = bot
             # Internal bot triggers the welcome speech sequence
             if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
-                asyncio.create_task(handle_vc_welcome_sequence(member, after.channel))
+                asyncio.create_task(handle_vc_welcome_sequence(member.guild, after.channel))
 
     # Slash command setup
     @bot.tree.command(name="createkey", description=f"Create key via bot")
@@ -361,12 +374,47 @@ def create_bot_instance(bot_info: dict):
                 color=discord.Color.green()
             )
             await interaction.followup.send(embed=embed, ephemeral=False)
+
+            # Trigger Welcome Speech Sequence in VC
+            if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
+                asyncio.create_task(handle_vc_welcome_sequence(guild, target_channel))
         except Exception as e:
             embed = create_embed(
                 title="❌ VC Join Failed",
                 description=f"Voice channel join karte waqt error aaya: `{str(e)}`\nMake sure bot has `Connect` & `Speak` permissions in VC!",
                 color=discord.Color.red()
             )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+
+    @bot.tree.command(name="speakwelcome", description=f"Manually trigger Girl Voice Welcome Dialogue in VC")
+    async def speakwelcome(interaction: discord.Interaction):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
+
+        if not check_user_access(interaction):
+            embed = create_embed(title="⛔ Permission Denied", description="Is command ke liye **`BOT ACCESS`** Role ya Admin permission honi chahiye.", color=discord.Color.red())
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            return
+
+        guild = interaction.guild
+        if not guild:
+            return
+
+        vc = guild.voice_client
+        if vc and vc.channel:
+            bot_display_name = interaction.client.user.name if interaction.client.user else name
+            embed = create_embed(
+                title="🎙️ Girl Voice Dialogue Started",
+                description=f"Teeno bots **{vc.channel.mention}** me 3-step sequential dialogue bol rahe hain!",
+                color=discord.Color.green()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            asyncio.create_task(handle_vc_welcome_sequence(guild, vc.channel))
+        else:
+            embed = create_embed(title="❌ Not Connected in VC", description="Pehle bot ko `/joinvc` se Voice Channel me join karayein.", color=discord.Color.red())
             await interaction.followup.send(embed=embed, ephemeral=False)
 
     @bot.tree.command(name="leavevc", description=f"Disconnect {name} from Voice Channel")
