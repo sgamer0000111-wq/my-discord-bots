@@ -113,33 +113,52 @@ def ensure_tts_audio_files():
         except Exception as e:
             logger.warning(f"Could not generate TTS files: {e}")
 
-async def play_audio_file(bot_user_id: int, guild: discord.Guild, audio_file: str):
+def find_bot_for_keyword(keyword: str):
+    for b_id, b_inst in GLOBAL_BOT_INSTANCES.items():
+        if b_inst and b_inst.user and keyword.upper() in b_inst.user.name.upper():
+            return b_inst
+    return None
+
+async def play_audio_for_bot_keyword(keyword: str, guild: discord.Guild, audio_file: str):
     if not os.path.exists(audio_file):
-        return
-    bot_inst = GLOBAL_BOT_INSTANCES.get(bot_user_id)
-    if not bot_inst:
+        logger.warning(f"Audio file missing: {audio_file}")
         return
     
+    bot_inst = find_bot_for_keyword(keyword)
+    if not bot_inst:
+        for b_id, b_inst in GLOBAL_BOT_INSTANCES.items():
+            if b_inst:
+                g = b_inst.get_guild(guild.id)
+                if g and g.voice_client and g.voice_client.is_connected():
+                    bot_inst = b_inst
+                    break
+
+    if not bot_inst:
+        logger.warning(f"No active bot found for keyword '{keyword}'")
+        return
+
     g = bot_inst.get_guild(guild.id)
     if not g or not g.voice_client:
+        logger.warning(f"Bot {bot_inst.user} is not in VC for guild {guild.name}")
         return
-    
+
     vc = g.voice_client
     if not vc.is_connected():
         return
 
     try:
+        logger.info(f"[{bot_inst.user.name}] Playing audio file: {audio_file}")
         if vc.is_playing():
             vc.stop()
-        
-        audio_source = discord.FFmpegPCMAudio(audio_file)
+
+        audio_source = discord.FFmpegPCMAudio(audio_file, options="-loglevel panic")
         vc.play(audio_source)
-        
+
         while vc.is_playing():
             await asyncio.sleep(0.3)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.6)
     except Exception as ex:
-        logger.warning(f"Audio playback error for bot {bot_user_id}: {ex}")
+        logger.error(f"Audio playback error for bot {bot_inst.user}: {ex}")
 
 async def handle_vc_welcome_sequence(guild: discord.Guild, channel: discord.VoiceChannel):
     async with SPEECH_LOCK:
@@ -147,14 +166,14 @@ async def handle_vc_welcome_sequence(guild: discord.Guild, channel: discord.Voic
         ensure_tts_audio_files()
         await asyncio.sleep(0.6)
 
-        # 1. Bot 3 (X CHEAT INTERNAL) speaks: "Welcome sir, how can I help you?"
-        await play_audio_file(1548212884843274240, guild, "audio_internal.mp3")
+        # 1. Bot 3 (INTERNAL) speaks: "Welcome sir, how can I help you?"
+        await play_audio_for_bot_keyword("INTERNAL", guild, "audio_internal.mp3")
 
-        # 2. Bot 2 (X CHEAT COVER SILENT) speaks: "Should I call any staff?"
-        await play_audio_file(1548209841191788574, guild, "audio_cover.mp3")
+        # 2. Bot 2 (COVER) speaks: "Should I call any staff?"
+        await play_audio_for_bot_keyword("COVER", guild, "audio_cover.mp3")
 
-        # 3. Bot 1 (X CHEAT SILENT MAX) speaks: "If you want to buy anything, I can call the owner."
-        await play_audio_file(1402125600809816074, guild, "audio_silent.mp3")
+        # 3. Bot 1 (SILENT MAX) speaks: "If you want to buy anything, I can call the owner."
+        await play_audio_for_bot_keyword("SILENT", guild, "audio_silent.mp3")
 
 
 async def vc_auto_reconnect_loop(bot, bot_name: str):
