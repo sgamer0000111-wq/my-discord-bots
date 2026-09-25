@@ -79,6 +79,36 @@ try:
 except Exception:
     pass
 
+def load_opus_lib():
+    if discord.opus.is_loaded():
+        return True
+    import ctypes.util
+    possible_paths = []
+    try:
+        discord_bin = os.path.join(os.path.dirname(discord.__file__), 'bin')
+        possible_paths.append(os.path.join(discord_bin, 'libopus-0.x64.dll'))
+        possible_paths.append(os.path.join(discord_bin, 'libopus-0.x86.dll'))
+    except Exception:
+        pass
+    for name in ['opus', 'libopus', 'libopus.so.0', 'libopus.so', 'libopus-0', 'opus.dll']:
+        found = ctypes.util.find_library(name)
+        if found:
+            possible_paths.append(found)
+        possible_paths.append(name)
+    for path in possible_paths:
+        try:
+            if path and (os.path.exists(path) or not os.path.isabs(path)):
+                discord.opus.load_opus(path)
+                if discord.opus.is_loaded():
+                    logger.info(f"Successfully loaded Opus library from: {path}")
+                    return True
+        except Exception:
+            continue
+    logger.warning("Could not load Opus library! Voice audio playback may fail.")
+    return False
+
+load_opus_lib()
+
 GLOBAL_BOT_INSTANCES = {}
 SPEECH_LOCK = asyncio.Lock()
 
@@ -136,10 +166,12 @@ def find_bot_for_keyword(keyword: str):
             return b_inst
     return None
 
-async def play_audio_for_bot_keyword(keyword: str, guild: discord.Guild, audio_file: str):
+async def play_audio_for_bot_keyword(keyword: str, guild: discord.Guild, audio_file: str, target_channel: Optional[discord.VoiceChannel] = None):
     if not os.path.exists(audio_file):
         logger.warning(f"Audio file missing: {audio_file}")
         return
+    
+    load_opus_lib()
     
     bot_inst = find_bot_for_keyword(keyword)
     if not bot_inst:
@@ -155,13 +187,23 @@ async def play_audio_for_bot_keyword(keyword: str, guild: discord.Guild, audio_f
         return
 
     g = bot_inst.get_guild(guild.id)
-    if not g or not g.voice_client:
-        logger.warning(f"Bot {bot_inst.user} is not in VC for guild {guild.name}")
+    if not g:
+        logger.warning(f"Bot {bot_inst.user} not found in guild {guild.name}")
         return
 
     vc = g.voice_client
-    if not vc.is_connected():
-        return
+    if not vc or not vc.is_connected():
+        if target_channel:
+            try:
+                logger.info(f"[{bot_inst.user.name}] Connecting to VC: {target_channel.name}")
+                vc = await target_channel.connect(reconnect=True, self_deaf=False)
+                bot_inst.saved_vc_id = target_channel.id
+            except Exception as e:
+                logger.warning(f"[{bot_inst.user.name}] Could not connect to VC: {e}")
+                return
+        else:
+            logger.warning(f"Bot {bot_inst.user} is not in VC for guild {guild.name}")
+            return
 
     try:
         logger.info(f"[{bot_inst.user.name}] Playing audio file: {audio_file}")
@@ -185,13 +227,13 @@ async def handle_vc_welcome_sequence(guild: discord.Guild, channel: discord.Voic
         await asyncio.sleep(0.6)
 
         # 1. Bot 3 (INTERNAL) speaks: "Welcome sir, how can I help you?"
-        await play_audio_for_bot_keyword("INTERNAL", guild, "audio_internal.mp3")
+        await play_audio_for_bot_keyword("INTERNAL", guild, "audio_internal.mp3", target_channel=channel)
 
         # 2. Bot 2 (COVER) speaks: "Should I call any staff?"
-        await play_audio_for_bot_keyword("COVER", guild, "audio_cover.mp3")
+        await play_audio_for_bot_keyword("COVER", guild, "audio_cover.mp3", target_channel=channel)
 
         # 3. Bot 1 (SILENT MAX) speaks: "If you want to buy anything, I can call the owner."
-        await play_audio_for_bot_keyword("SILENT", guild, "audio_silent.mp3")
+        await play_audio_for_bot_keyword("SILENT", guild, "audio_silent.mp3", target_channel=channel)
 
 
 async def vc_auto_reconnect_loop(bot, bot_name: str):
@@ -265,8 +307,18 @@ def create_bot_instance(bot_info: dict):
         if not member.bot and before.channel != after.channel and after.channel is not None:
             if bot.user:
                 GLOBAL_BOT_INSTANCES[bot.user.id] = bot
-            # Internal bot triggers the welcome speech sequence
-            if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
+            
+            uname = bot.user.name.upper() if bot.user else ""
+            has_internal_bot = any("INTERNAL" in (b.user.name.upper() if b.user else "") for b in GLOBAL_BOT_INSTANCES.values())
+            
+            should_trigger = False
+            if has_internal_bot and ("INTERNAL" in uname or bot.user.id == 1548212884843274240):
+                should_trigger = True
+            elif not has_internal_bot and GLOBAL_BOT_INSTANCES and list(GLOBAL_BOT_INSTANCES.keys())[0] == bot.user.id:
+                should_trigger = True
+
+            if should_trigger:
+                logger.info(f"[{bot.user.name if bot.user else name}] Voice state update: {member.display_name} joined {after.channel.name}")
                 asyncio.create_task(handle_vc_welcome_sequence(member.guild, after.channel))
 
     # Slash command setup
