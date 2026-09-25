@@ -144,6 +144,32 @@ async def handle_vc_welcome_sequence(member: discord.Member, channel: discord.Vo
         await play_audio_file(1402125600809816074, member.guild, "audio_silent.mp3")
 
 
+async def vc_auto_reconnect_loop(bot, bot_name: str):
+    await asyncio.sleep(10)
+    while not bot.is_closed():
+        await asyncio.sleep(15)
+        vc_id = getattr(bot, "saved_vc_id", None) or os.environ.get("VC_CHANNEL_ID")
+        if vc_id:
+            try:
+                ch_id = int(vc_id)
+                channel = bot.get_channel(ch_id)
+                if not channel:
+                    for g in bot.guilds:
+                        ch = g.get_channel(ch_id)
+                        if ch:
+                            channel = ch
+                            break
+                
+                if channel and isinstance(channel, (discord.VoiceChannel, discord.StageChannel)):
+                    guild = channel.guild
+                    voice_client = guild.voice_client
+                    if not voice_client or not voice_client.is_connected():
+                        logger.info(f"[{bot_name}] Auto-reconnecting 24/7 to VC: {channel.name}")
+                        await channel.connect(reconnect=True, self_deaf=True)
+            except Exception as ex:
+                logger.debug(f"[{bot_name}] VC Auto-Reconnect error: {ex}")
+
+
 def create_bot_instance(bot_info: dict):
     token = bot_info["token"]
     name = bot_info["name"]
@@ -158,6 +184,10 @@ def create_bot_instance(bot_info: dict):
         if bot.user:
             GLOBAL_BOT_INSTANCES[bot.user.id] = bot
             
+        if not getattr(bot, "auto_vc_task_started", False):
+            bot.auto_vc_task_started = True
+            asyncio.create_task(vc_auto_reconnect_loop(bot, name))
+
         try:
             # Clear per-guild commands to eliminate duplicate slash command entries in Discord
             for guild in bot.guilds:
@@ -310,6 +340,7 @@ def create_bot_instance(bot_info: dict):
             voice_client = guild.voice_client
             if voice_client:
                 if voice_client.channel and voice_client.channel.id == target_channel.id:
+                    bot.saved_vc_id = target_channel.id
                     embed = create_embed(
                         title="🔊 Already Connected in VC",
                         description=f"Bot already **{target_channel.mention}** me connected hai (24/7 Mode).",
@@ -322,6 +353,7 @@ def create_bot_instance(bot_info: dict):
             else:
                 await target_channel.connect(reconnect=True, self_deaf=True)
 
+            bot.saved_vc_id = target_channel.id
             bot_display_name = interaction.client.user.name if interaction.client.user else name
             embed = create_embed(
                 title=f"🔊 {bot_display_name} Joined Voice Channel!",
@@ -358,6 +390,7 @@ def create_bot_instance(bot_info: dict):
         voice_client = guild.voice_client if guild else None
 
         if voice_client:
+            bot.saved_vc_id = None
             vc_name = voice_client.channel.name if voice_client.channel else "VC"
             await voice_client.disconnect(force=True)
             bot_display_name = interaction.client.user.name if interaction.client.user else name
