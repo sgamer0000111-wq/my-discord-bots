@@ -113,6 +113,23 @@ def ensure_tts_audio_files():
         except Exception as e:
             logger.warning(f"Could not generate TTS files: {e}")
 
+FFMPEG_EXECUTABLE_PATH = None
+
+def get_ffmpeg_executable() -> str:
+    global FFMPEG_EXECUTABLE_PATH
+    if FFMPEG_EXECUTABLE_PATH and os.path.exists(FFMPEG_EXECUTABLE_PATH):
+        return FFMPEG_EXECUTABLE_PATH
+    try:
+        import static_ffmpeg.run
+        ffmpeg_exe, _ = static_ffmpeg.run.get_or_fetch_platform_executables_else_raise()
+        if ffmpeg_exe and os.path.exists(ffmpeg_exe):
+            FFMPEG_EXECUTABLE_PATH = ffmpeg_exe
+            return FFMPEG_EXECUTABLE_PATH
+    except Exception as e:
+        logger.warning(f"Could not resolve static_ffmpeg path: {e}")
+    return "ffmpeg"
+
+
 def find_bot_for_keyword(keyword: str):
     for b_id, b_inst in GLOBAL_BOT_INSTANCES.items():
         if b_inst and b_inst.user and keyword.upper() in b_inst.user.name.upper():
@@ -151,7 +168,8 @@ async def play_audio_for_bot_keyword(keyword: str, guild: discord.Guild, audio_f
         if vc.is_playing():
             vc.stop()
 
-        audio_source = discord.FFmpegPCMAudio(audio_file, options="-loglevel panic")
+        ffmpeg_exe = get_ffmpeg_executable()
+        audio_source = discord.FFmpegPCMAudio(audio_file, executable=ffmpeg_exe)
         vc.play(audio_source)
 
         while vc.is_playing():
