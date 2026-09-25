@@ -73,6 +73,77 @@ def get_seller_key_for_bot(bot_user, fallback_key: str) -> str:
     return fallback_key
 
 
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass
+
+GLOBAL_BOT_INSTANCES = {}
+SPEECH_LOCK = asyncio.Lock()
+
+def ensure_tts_audio_files():
+    try:
+        from gtts import gTTS
+        files_to_create = [
+            ("audio_internal.mp3", "Welcome sir, how can I help you?"),
+            ("audio_cover.mp3", "Should I call any staff?"),
+            ("audio_silent.mp3", "If you want to buy anything, I can call the owner."),
+        ]
+        for fname, text in files_to_create:
+            if not os.path.exists(fname):
+                tts = gTTS(text=text, lang="en")
+                tts.save(fname)
+                logger.info(f"Generated TTS audio file: {fname}")
+    except Exception as e:
+        logger.warning(f"Could not generate TTS files: {e}")
+
+async def play_audio_file(bot_user_id: int, guild: discord.Guild, audio_file: str):
+    if not os.path.exists(audio_file):
+        return
+    bot_inst = GLOBAL_BOT_INSTANCES.get(bot_user_id)
+    if not bot_inst:
+        return
+    
+    g = bot_inst.get_guild(guild.id)
+    if not g or not g.voice_client:
+        return
+    
+    vc = g.voice_client
+    if not vc.is_connected():
+        return
+
+    try:
+        if vc.is_playing():
+            vc.stop()
+        
+        audio_source = discord.FFmpegPCMAudio(audio_file)
+        vc.play(audio_source)
+        
+        while vc.is_playing():
+            await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)
+    except Exception as ex:
+        logger.warning(f"Audio playback error for bot {bot_user_id}: {ex}")
+
+async def handle_vc_welcome_sequence(member: discord.Member, channel: discord.VoiceChannel):
+    async with SPEECH_LOCK:
+        if not member.voice or member.voice.channel.id != channel.id:
+            return
+        
+        ensure_tts_audio_files()
+        await asyncio.sleep(0.8)
+
+        # 1. Bot 3 (X CHEAT INTERNAL) speaks: "Welcome sir, how can I help you?"
+        await play_audio_file(1548212884843274240, member.guild, "audio_internal.mp3")
+
+        # 2. Bot 2 (X CHEAT COVER SILENT) speaks: "Should I call any staff?"
+        await play_audio_file(1548209841191788574, member.guild, "audio_cover.mp3")
+
+        # 3. Bot 1 (X CHEAT SILENT MAX) speaks: "If you want to buy anything, I can call the owner."
+        await play_audio_file(1402125600809816074, member.guild, "audio_silent.mp3")
+
+
 def create_bot_instance(bot_info: dict):
     token = bot_info["token"]
     name = bot_info["name"]
@@ -84,6 +155,9 @@ def create_bot_instance(bot_info: dict):
     @bot.event
     async def on_ready():
         logger.info(f"[{name}] Logged in as {bot.user} (ID: {bot.user.id})")
+        if bot.user:
+            GLOBAL_BOT_INSTANCES[bot.user.id] = bot
+            
         try:
             # Clear per-guild commands to eliminate duplicate slash command entries in Discord
             for guild in bot.guilds:
@@ -105,6 +179,15 @@ def create_bot_instance(bot_info: dict):
                 name=f"{bot.user.name if bot.user else name} | /createkey"
             )
         )
+
+    @bot.event
+    async def on_voice_state_update(member, before, after):
+        if not member.bot and before.channel != after.channel and after.channel is not None:
+            if bot.user:
+                GLOBAL_BOT_INSTANCES[bot.user.id] = bot
+            # Internal bot triggers the welcome speech sequence
+            if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
+                asyncio.create_task(handle_vc_welcome_sequence(member, after.channel))
 
     # Slash command setup
     @bot.tree.command(name="createkey", description=f"Create key via bot")
@@ -181,7 +264,7 @@ def create_bot_instance(bot_info: dict):
     # 24/7 Voice Channel Commands
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
-    async def joinvc(interaction: discord.Interaction, channel: Optional[discord.abc.GuildChannel] = None):
+    async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer(ephemeral=False)
