@@ -48,6 +48,16 @@ BOTS_CONFIG = [
         "name": "X CHEAT INTERNAL",
         "token": clean_val(os.environ.get("BOT3_TOKEN", "")),
         "seller_key": clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
+    },
+    {
+        "name": "SILENT KILLER",
+        "token": clean_val(os.environ.get("BOT4_TOKEN", "MTU1MTA1MTI0MzU0MjE1MTI5OQ.G5Fngp.RBrrGoPFwksZzHrs4x2Jjm-Fupimty0J5GggH8")),
+        "seller_key": clean_val(os.environ.get("BOT4_SELLER_KEY", "bot_br_live_6b917f44fde2f98eb2180746"))
+    },
+    {
+        "name": "X CHEAT AUTH SYSTEM",
+        "token": clean_val(os.environ.get("BOT5_TOKEN", "MTU0ODE5MTA2MDI2ODk0MTQxNQ.G3w9nG.r662XTHMcih9DJKnPVzzOwhoMlUVC6TVuiFT9E")),
+        "seller_key": clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
     }
 ]
 
@@ -62,14 +72,26 @@ def get_seller_key_for_bot(bot_user, fallback_key: str) -> str:
         return clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
     elif bot_id == 1548212884843274240:
         return clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
+    elif bot_id == 1551051243542151299:
+        return clean_val(os.environ.get("BOT4_SELLER_KEY", "bot_br_live_6b917f44fde2f98eb2180746"))
+    elif bot_id == 1548191060268941415:
+        return clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
 
     uname = getattr(bot_user, "name", "").upper()
     if "INTERNAL" in uname:
         return clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
     elif "COVER" in uname:
         return clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
+    elif "KILLER" in uname:
+        return clean_val(os.environ.get("BOT4_SELLER_KEY", "bot_br_live_6b917f44fde2f98eb2180746"))
+    elif "AUTH SYSTEM" in uname or "AUTH" in uname:
+        return clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
     elif "SILENT" in uname or "MAX" in uname:
         return clean_val(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
+    elif "BOT 4" in uname or "BOT4" in uname:
+        return clean_val(os.environ.get("BOT4_SELLER_KEY", "bot_br_live_6b917f44fde2f98eb2180746"))
+    elif "BOT 5" in uname or "BOT5" in uname:
+        return clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
     return fallback_key
 
 
@@ -588,7 +610,7 @@ async def self_ping_keep_alive():
 
 
 async def main():
-    logger.info("Starting Multi-Bot Runner for all 3 Discord Bots...")
+    logger.info("Starting Multi-Bot Runner for Discord Bots...")
     
     # Start Web Health Server for Cloud Platforms (Render/Railway/etc.)
     try:
@@ -602,12 +624,13 @@ async def main():
     tasks = []
     for b_config in BOTS_CONFIG:
         if not b_config["token"]:
-            logger.error(f"Missing token for {b_config['name']}. Please set Environment Variable.")
+            logger.info(f"[{b_config['name']}] Token not configured, skipping.")
             continue
         bot_obj, token = create_bot_instance(b_config)
         tasks.append(bot_obj.start(token))
 
     if tasks:
+        logger.info(f"Successfully launched {len(tasks)} bot instance(s).")
         await asyncio.gather(*tasks)
     else:
         logger.error("No bot tokens configured. Exiting.")
