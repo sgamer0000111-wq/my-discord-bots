@@ -33,31 +33,31 @@ def clean_val(val: str) -> str:
         val = val.split("|")[-1]
     return val.strip()
 
-# List of configured bots with Environment Variable support
+# List of configured bots with Environment Variable support & Fallback Tokens
 BOTS_CONFIG = [
     {
         "name": "X CHEAT SILENT MAX",
-        "token": clean_val(os.environ.get("BOT1_TOKEN", "")),
+        "token": clean_val(os.environ.get("BOT1_TOKEN", "MTQwMjEyNTYwMDgwOTgxNjA3NA.GjNv4E.ZE8jNgqb258s7mzdF73bodrpvpQqfuHtXSnQRA")),
         "seller_key": clean_val(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
     },
     {
         "name": "X CHEAT COVER SILENT",
-        "token": clean_val(os.environ.get("BOT2_TOKEN", "")),
+        "token": clean_val(os.environ.get("BOT2_TOKEN", "MTU0ODIwOTg0MTE5MTc4ODU3NA.GC1W2v.ytqeZuWEn6ude8azYp3Y8ssLmK5wM_wH1ebpdc")),
         "seller_key": clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
     },
     {
         "name": "X CHEAT INTERNAL",
-        "token": clean_val(os.environ.get("BOT3_TOKEN", "")),
+        "token": clean_val(os.environ.get("BOT3_TOKEN", "MTU0ODIxMjg4NDg0MzI3NDI0MA.GdEHtQ.CASFXOELkRlkPiJgl4rtmeddfCgzlXw0A7gn_g")),
         "seller_key": clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
     },
     {
         "name": "SILENT KILLER",
-        "token": clean_val(os.environ.get("BOT4_TOKEN", "MTU1MTA1MTI0MzU0MjE1MTI5OQ.G5Fngp.RBrrGoPFwksZzHrs4x2Jjm-Fupimty0J5GggH8")),
+        "token": clean_val(os.environ.get("BOT4_TOKEN", "MTU1MTA1MTI0MzU0MjE1MTI5OQ.Ggqj0L.DTAyzyCgW_0mKRuYlTPgG_wPrBq3ZXVbiov_8Y")),
         "seller_key": clean_val(os.environ.get("BOT4_SELLER_KEY", "bot_br_live_6b917f44fde2f98eb2180746"))
     },
     {
         "name": "X CHEAT AUTH SYSTEM",
-        "token": clean_val(os.environ.get("BOT5_TOKEN", "MTU0ODE5MTA2MDI2ODk0MTQxNQ.G3w9nG.r662XTHMcih9DJKnPVzzOwhoMlUVC6TVuiFT9E")),
+        "token": clean_val(os.environ.get("BOT5_TOKEN", "MTU0ODE5MTA2MDI2ODk0MTQxNQ.GSQsgd.T4J2I4do2FrP7FT9-b5uaXR6NTBOXFwYi9M5k8")),
         "seller_key": clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
     }
 ]
@@ -95,12 +95,6 @@ def get_seller_key_for_bot(bot_user, fallback_key: str) -> str:
         return clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
     return fallback_key
 
-
-try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()
-except Exception:
-    pass
 
 def load_opus_lib():
     if discord.opus.is_loaded():
@@ -284,7 +278,7 @@ async def vc_auto_reconnect_loop(bot, bot_name: str):
                     voice_client = guild.voice_client
                     if not voice_client or not voice_client.is_connected():
                         logger.info(f"[{bot_name}] Auto-reconnecting 24/7 to VC: {channel.name}")
-                        await channel.connect(reconnect=True, self_deaf=True)
+                        await channel.connect(reconnect=True, self_deaf=False)
             except Exception as ex:
                 logger.debug(f"[{bot_name}] VC Auto-Reconnect error: {ex}")
 
@@ -308,7 +302,6 @@ def create_bot_instance(bot_info: dict):
             asyncio.create_task(vc_auto_reconnect_loop(bot, name))
 
         try:
-            # Clear per-guild commands to eliminate duplicate slash command entries in Discord
             for guild in bot.guilds:
                 try:
                     bot.tree.clear_commands(guild=guild)
@@ -316,7 +309,6 @@ def create_bot_instance(bot_info: dict):
                 except Exception:
                     pass
 
-            # Sync Global commands clean
             synced_global = await bot.tree.sync()
             logger.info(f"[{name}] Synced {len(synced_global)} global slash command(s).")
         except Exception as e:
@@ -396,7 +388,6 @@ def create_bot_instance(bot_info: dict):
         )
         await interaction.response.send_message(embed=embed, view=ControlPanelView(), ephemeral=False)
 
-    # Tree error handler for permission checks and command failures
     @bot.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         if isinstance(error, (discord.app_commands.MissingPermissions, discord.app_commands.CheckFailure)):
@@ -420,7 +411,6 @@ def create_bot_instance(bot_info: dict):
         except Exception:
             pass
 
-    # 24/7 Voice Channel Commands
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
     async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
@@ -480,7 +470,7 @@ def create_bot_instance(bot_info: dict):
                 else:
                     await voice_client.move_to(target_channel)
             else:
-                await target_channel.connect(reconnect=True, self_deaf=True)
+                await target_channel.connect(reconnect=True, self_deaf=False)
 
             bot.saved_vc_id = target_channel.id
             bot_display_name = interaction.client.user.name if interaction.client.user else name
@@ -491,7 +481,6 @@ def create_bot_instance(bot_info: dict):
             )
             await interaction.followup.send(embed=embed, ephemeral=False)
 
-            # Trigger Welcome Speech Sequence in VC
             if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
                 asyncio.create_task(handle_vc_welcome_sequence(guild, target_channel))
         except Exception as e:
@@ -582,7 +571,7 @@ async def start_web_health_server():
     app = web.Application()
     
     async def health_check(request):
-        return web.Response(text="OK - 3 Discord Bots Running 24/7", status=200)
+        return web.Response(text="OK - 5 Discord Bots Running 24/7", status=200)
 
     app.router.add_get("/", health_check)
     app.router.add_get("/health", health_check)
@@ -605,7 +594,7 @@ async def self_ping_keep_alive():
     import aiohttp
     async with aiohttp.ClientSession() as session:
         while True:
-            await asyncio.sleep(240)  # Ping every 4 minutes to stay awake
+            await asyncio.sleep(240)
             for u in urls_to_ping:
                 try:
                     async with session.get(u, timeout=10) as resp:
@@ -617,13 +606,11 @@ async def self_ping_keep_alive():
 async def main():
     logger.info("Starting Multi-Bot Runner for Discord Bots...")
     
-    # Start Web Health Server for Cloud Platforms (Render/Railway/etc.)
     try:
         await start_web_health_server()
     except Exception as e:
         logger.warning(f"Could not start web server: {e}")
 
-    # Launch background keep-alive self ping loop
     asyncio.create_task(self_ping_keep_alive())
 
     tasks = []

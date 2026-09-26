@@ -1,11 +1,10 @@
-FROM python:3.11-slim
+FROM python:3.11
 
-# Install system dependencies (FFmpeg, Opus library, build tools)
+# Install system dependencies (FFmpeg & Opus library)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libopus0 \
     libopus-dev \
-    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
