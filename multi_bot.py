@@ -304,13 +304,13 @@ def create_bot_instance(bot_info: dict):
         try:
             for guild in bot.guilds:
                 try:
-                    bot.tree.clear_commands(guild=guild)
+                    bot.tree.copy_global_to(guild=guild)
                     await bot.tree.sync(guild=guild)
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.debug(f"[{name}] Guild sync warning: {ex}")
 
             synced_global = await bot.tree.sync()
-            logger.info(f"[{name}] Synced {len(synced_global)} global slash command(s).")
+            logger.info(f"[{name}] Synced {len(synced_global)} slash command(s) for guild and global.")
         except Exception as e:
             logger.error(f"[{name}] Sync error: {e}")
 
@@ -616,16 +616,17 @@ async def main():
     tasks = []
     for b_config in BOTS_CONFIG:
         if not b_config["token"]:
-            logger.info(f"[{b_config['name']}] Token not configured, skipping.")
+            logger.warning(f"[{b_config['name']}] Token not set in Environment Variables.")
             continue
         bot_obj, token = create_bot_instance(b_config)
         tasks.append(bot_obj.start(token))
 
     if tasks:
-        logger.info(f"Successfully launched {len(tasks)} bot instance(s).")
+        logger.info(f"Successfully launched {len(tasks)} bot instance(s). Running 24/7...")
         await asyncio.gather(*tasks)
     else:
-        logger.error("No bot tokens configured. Exiting.")
+        logger.warning("No bot tokens set in Environment Variables. Web Health Server is running 24/7 on port 8080. Please add BOT1_TOKEN .. BOT5_TOKEN in Render Environment tab.")
+        await asyncio.Event().wait()
 
 if __name__ == "__main__":
     try:
