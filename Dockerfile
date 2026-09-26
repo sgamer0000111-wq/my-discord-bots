@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Explicitly install discord.py and dependencies directly
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir discord.py PyNaCl edge-tts gTTS aiohttp python-dotenv
 
 COPY . .
 
