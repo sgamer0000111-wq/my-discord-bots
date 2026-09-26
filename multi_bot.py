@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import os
+import shutil
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -170,6 +171,10 @@ FFMPEG_EXECUTABLE_PATH = None
 def get_ffmpeg_executable() -> str:
     global FFMPEG_EXECUTABLE_PATH
     if FFMPEG_EXECUTABLE_PATH and os.path.exists(FFMPEG_EXECUTABLE_PATH):
+        return FFMPEG_EXECUTABLE_PATH
+    sys_ffmpeg = shutil.which("ffmpeg")
+    if sys_ffmpeg:
+        FFMPEG_EXECUTABLE_PATH = sys_ffmpeg
         return FFMPEG_EXECUTABLE_PATH
     try:
         import static_ffmpeg.run
