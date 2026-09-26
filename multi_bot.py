@@ -33,31 +33,31 @@ def clean_val(val: str) -> str:
         val = val.split("|")[-1]
     return val.strip()
 
-# List of configured bots with Environment Variable support & Fallback Tokens
+# List of configured bots with Environment Variable support
 BOTS_CONFIG = [
     {
         "name": "X CHEAT SILENT MAX",
-        "token": clean_val(os.environ.get("BOT1_TOKEN", "MTQwMjEyNTYwMDgwOTgxNjA3NA.GjNv4E.ZE8jNgqb258s7mzdF73bodrpvpQqfuHtXSnQRA")),
+        "token": clean_val(os.environ.get("BOT1_TOKEN", "")),
         "seller_key": clean_val(os.environ.get("BOT1_SELLER_KEY", "bot_br_live_8c874050bd20af61e0126617"))
     },
     {
         "name": "X CHEAT COVER SILENT",
-        "token": clean_val(os.environ.get("BOT2_TOKEN", "MTU0ODIwOTg0MTE5MTc4ODU3NA.GC1W2v.ytqeZuWEn6ude8azYp3Y8ssLmK5wM_wH1ebpdc")),
+        "token": clean_val(os.environ.get("BOT2_TOKEN", "")),
         "seller_key": clean_val(os.environ.get("BOT2_SELLER_KEY", "bot_br_live_1017ee6a4b8ea826564f58f4"))
     },
     {
         "name": "X CHEAT INTERNAL",
-        "token": clean_val(os.environ.get("BOT3_TOKEN", "MTU0ODIxMjg4NDg0MzI3NDI0MA.GdEHtQ.CASFXOELkRlkPiJgl4rtmeddfCgzlXw0A7gn_g")),
+        "token": clean_val(os.environ.get("BOT3_TOKEN", "")),
         "seller_key": clean_val(os.environ.get("BOT3_SELLER_KEY", "bot_br_live_ea8e146eeeb0e3f97192aa9c"))
     },
     {
         "name": "SILENT KILLER",
-        "token": clean_val(os.environ.get("BOT4_TOKEN", "MTU1MTA1MTI0MzU0MjE1MTI5OQ.Ggqj0L.DTAyzyCgW_0mKRuYlTPgG_wPrBq3ZXVbiov_8Y")),
+        "token": clean_val(os.environ.get("BOT4_TOKEN", "")),
         "seller_key": clean_val(os.environ.get("BOT4_SELLER_KEY", "bot_br_live_6b917f44fde2f98eb2180746"))
     },
     {
         "name": "X CHEAT AUTH SYSTEM",
-        "token": clean_val(os.environ.get("BOT5_TOKEN", "MTU0ODE5MTA2MDI2ODk0MTQxNQ.GSQsgd.T4J2I4do2FrP7FT9-b5uaXR6NTBOXFwYi9M5k8")),
+        "token": clean_val(os.environ.get("BOT5_TOKEN", "")),
         "seller_key": clean_val(os.environ.get("BOT5_SELLER_KEY", "bot_br_live_99de43b1a40523205cde54f0"))
     }
 ]
