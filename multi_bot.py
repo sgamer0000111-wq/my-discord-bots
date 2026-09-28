@@ -651,6 +651,23 @@ async def self_ping_keep_alive():
                     pass
 
 
+async def start_single_bot(b_config: dict):
+    name = b_config["name"]
+    token = b_config["token"]
+    if not token:
+        logger.warning(f"[{name}] Token not set in Environment Variables.")
+        return
+
+    try:
+        bot_obj, _ = create_bot_instance(b_config)
+        logger.info(f"[{name}] Starting Discord bot instance...")
+        await bot_obj.start(token)
+    except discord.errors.LoginFailure:
+        logger.error(f"[{name}] Invalid or revoked Discord Token! Skipping this bot so other bots stay online.")
+    except Exception as ex:
+        logger.error(f"[{name}] Exception while running bot: {ex}")
+
+
 async def main():
     logger.info("Starting Multi-Bot Runner for Discord Bots...")
     
@@ -661,20 +678,20 @@ async def main():
 
     asyncio.create_task(self_ping_keep_alive())
 
-    tasks = []
+    bot_tasks = []
     for b_config in BOTS_CONFIG:
-        if not b_config["token"]:
+        if b_config["token"]:
+            t = asyncio.create_task(start_single_bot(b_config))
+            bot_tasks.append(t)
+        else:
             logger.warning(f"[{b_config['name']}] Token not set in Environment Variables.")
-            continue
-        bot_obj, token = create_bot_instance(b_config)
-        tasks.append(bot_obj.start(token))
 
-    if tasks:
-        logger.info(f"Successfully launched {len(tasks)} bot instance(s). Running 24/7...")
-        await asyncio.gather(*tasks)
+    if bot_tasks:
+        logger.info(f"Successfully launched {len(bot_tasks)} bot task manager(s). Running 24/7...")
     else:
-        logger.warning("No bot tokens set in Environment Variables. Web Health Server is running 24/7 on port 8080. Please add BOT1_TOKEN .. BOT5_TOKEN in Render Environment tab.")
-        await asyncio.Event().wait()
+        logger.warning("No bot tokens set in Environment Variables. Web Health Server is running 24/7 on port 8080.")
+
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     try:
