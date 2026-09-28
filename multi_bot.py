@@ -328,6 +328,24 @@ def create_bot_instance(bot_info: dict):
                 GLOBAL_BOT_INSTANCES[bot.user.id] = bot
             
             uname = bot.user.name.upper() if bot.user else ""
+            
+            # Check if joining member has Administrator permission or Admin role
+            is_admin = False
+            if isinstance(member, discord.Member):
+                if member.guild_permissions.administrator:
+                    is_admin = True
+                else:
+                    for r in member.roles:
+                        if r.permissions.administrator or r.name.upper() in ["ADMINISTRATOR", "ADMIN", "OWNER"]:
+                            is_admin = True
+                            break
+
+            # If user is Admin, X CHEAT AUTH SYSTEM bot plays Owner Announcement Audio!
+            is_auth_bot = "AUTH" in uname or bot.user.id == 1548191060268941415
+            if is_admin and is_auth_bot:
+                logger.info(f"[AUTH BOT] Admin/Owner {member.display_name} joined VC {after.channel.name}. Playing Owner Detected Audio.")
+                asyncio.create_task(play_audio_for_bot_keyword("AUTH", member.guild, "audio_owner.mp3", target_channel=after.channel))
+
             has_internal_bot = any("INTERNAL" in (b.user.name.upper() if b.user else "") for b in GLOBAL_BOT_INSTANCES.values())
             
             should_trigger = False
@@ -559,6 +577,36 @@ def create_bot_instance(bot_info: dict):
                 description="Bot filhal kisi Voice Channel me connected nahi hai.",
                 color=discord.Color.red()
             )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+
+    @bot.tree.command(name="speakowner", description="Play Owner Surveillance Announcement audio in VC")
+    async def speakowner(interaction: discord.Interaction):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
+
+        if not check_user_access(interaction):
+            embed = create_embed(title="⛔ Permission Denied", description="Is command ke liye **`BOT ACCESS`** Role ya Admin permission honi chahiye.", color=discord.Color.red())
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            return
+
+        guild = interaction.guild
+        if not guild:
+            return
+
+        vc = guild.voice_client
+        if vc and vc.channel:
+            embed = create_embed(
+                title="🛡️ Owner Detected Audio Started",
+                description=f"**X CHEAT AUTH SYSTEM** bot **{vc.channel.mention}** me Owner Surveillance announcement play kar raha hai!",
+                color=discord.Color.green()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=False)
+            asyncio.create_task(play_audio_for_bot_keyword("AUTH", guild, "audio_owner.mp3", target_channel=vc.channel))
+        else:
+            embed = create_embed(title="❌ Not Connected in VC", description="Pehle bot ko `/joinvc` se Voice Channel me join karayein.", color=discord.Color.red())
             await interaction.followup.send(embed=embed, ephemeral=False)
 
     return bot, token
