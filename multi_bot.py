@@ -399,12 +399,19 @@ def create_bot_instance(bot_info: dict):
     @bot.tree.command(name="panel", description=f"Open Control Panel for {name}")
     @has_bot_access()
     async def panel(interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         embed = create_embed(
             title=f"🛠️ {name} Control Panel",
             description="Niche diye gaye buttons se direct keys create karein:",
             color=discord.Color.dark_theme()
         )
-        await interaction.response.send_message(embed=embed, view=ControlPanelView(), ephemeral=False)
+        try:
+            await interaction.followup.send(embed=embed, view=ControlPanelView(), ephemeral=False)
+        except Exception:
+            pass
 
     @bot.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
@@ -433,8 +440,7 @@ def create_bot_instance(bot_info: dict):
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
     async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
         try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=False)
+            await interaction.response.defer(thinking=True, ephemeral=False)
         except Exception:
             pass
 
