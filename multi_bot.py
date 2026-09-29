@@ -440,7 +440,8 @@ def create_bot_instance(bot_info: dict):
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
     async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
         try:
-            await interaction.response.defer(thinking=True, ephemeral=False)
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
         except Exception:
             pass
 
@@ -450,7 +451,10 @@ def create_bot_instance(bot_info: dict):
                 description="Is command ko chalane ke liye aapke paas **`BOT ACCESS`** Role ya Administrator permission honi chahiye.",
                 color=discord.Color.red()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=False)
+            except Exception:
+                pass
             return
 
         target_channel = None
@@ -470,14 +474,20 @@ def create_bot_instance(bot_info: dict):
                 description="Kripya pehle kisi Voice Channel me join hon ya command me `channel` select karein.",
                 color=discord.Color.red()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=False)
+            except Exception:
+                pass
             return
 
         try:
             guild = interaction.guild
             if not guild:
                 embed = create_embed(title="❌ Server Only", description="Is command ko server me chalayein.", color=discord.Color.red())
-                await interaction.followup.send(embed=embed, ephemeral=False)
+                try:
+                    await interaction.followup.send(embed=embed, ephemeral=False)
+                except Exception:
+                    pass
                 return
 
             voice_client = guild.voice_client
@@ -489,12 +499,15 @@ def create_bot_instance(bot_info: dict):
                         description=f"Bot already **{target_channel.mention}** me connected hai (24/7 Mode).",
                         color=discord.Color.blue()
                     )
-                    await interaction.followup.send(embed=embed, ephemeral=False)
+                    try:
+                        await interaction.followup.send(embed=embed, ephemeral=False)
+                    except Exception:
+                        pass
                     return
                 else:
-                    await voice_client.move_to(target_channel)
+                    await asyncio.wait_for(voice_client.move_to(target_channel), timeout=8.0)
             else:
-                await target_channel.connect(reconnect=True, self_deaf=False)
+                await asyncio.wait_for(target_channel.connect(reconnect=True, self_deaf=False), timeout=8.0)
 
             bot.saved_vc_id = target_channel.id
             bot_display_name = interaction.client.user.name if interaction.client.user else name
@@ -503,17 +516,24 @@ def create_bot_instance(bot_info: dict):
                 description=f"Bot successfully **{target_channel.mention}** me join ho gaya hai aur **24/7** connected rahega!",
                 color=discord.Color.green()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=False)
+            except Exception:
+                pass
 
             if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
                 asyncio.create_task(handle_vc_welcome_sequence(guild, target_channel))
         except Exception as e:
+            logger.error(f"[{name}] VC Join error: {e}")
             embed = create_embed(
                 title="❌ VC Join Failed",
                 description=f"Voice channel join karte waqt error aaya: `{str(e)}`\nMake sure bot has `Connect` & `Speak` permissions in VC!",
                 color=discord.Color.red()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=False)
+            except Exception:
+                pass
 
     @bot.tree.command(name="speakwelcome", description=f"Manually trigger Girl Voice Welcome Dialogue in VC")
     async def speakwelcome(interaction: discord.Interaction):
