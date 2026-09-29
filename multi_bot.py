@@ -358,6 +358,21 @@ def create_bot_instance(bot_info: dict):
                 logger.info(f"[{bot.user.name if bot.user else name}] Voice state update: {member.display_name} joined {after.channel.name}")
                 asyncio.create_task(handle_vc_welcome_sequence(member.guild, after.channel))
 
+async def send_interaction_response(interaction: discord.Interaction, embed: discord.Embed, view: Optional[discord.ui.View] = None, ephemeral: bool = False):
+    try:
+        if interaction.response.is_done():
+            if view:
+                await interaction.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+            else:
+                await interaction.followup.send(embed=embed, ephemeral=ephemeral)
+        else:
+            if view:
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    except Exception as e:
+        logger.error(f"Interaction response error: {e}")
+
     # Slash command setup
     @bot.tree.command(name="createkey", description=f"Create key via bot")
     @discord.app_commands.describe(
@@ -371,7 +386,11 @@ def create_bot_instance(bot_info: dict):
         days: discord.app_commands.Choice[int],
         prefix: str = "XCHEAT"
     ):
-        await interaction.response.defer(ephemeral=False)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         note_str = f"Created via Discord by {interaction.user}"
         active_seller_key = get_seller_key_for_bot(interaction.client.user, seller_key)
         active_api_client = KeyAuthSellerAPI(seller_key=active_seller_key, api_url=config.KEYAUTH_API_URL)
@@ -390,28 +409,21 @@ def create_bot_instance(bot_info: dict):
             expiry_label = "Lifetime (Unlimited)" if days.value >= 9999 else f"{days.value} Days"
             embed.add_field(name="Duration", value=expiry_label, inline=True)
             embed.add_field(name="Created By", value=interaction.user.mention, inline=False)
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
         else:
             msg = res.get("message", "Failed to generate key.")
             embed = create_embed(title="❌ Key Generation Failed", description=msg, color=discord.Color.red())
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
 
     @bot.tree.command(name="panel", description=f"Open Control Panel for {name}")
     @has_bot_access()
     async def panel(interaction: discord.Interaction):
-        try:
-            await interaction.response.defer(ephemeral=False)
-        except Exception:
-            pass
         embed = create_embed(
             title=f"🛠️ {name} Control Panel",
             description="Niche diye gaye buttons se direct keys create karein:",
             color=discord.Color.dark_theme()
         )
-        try:
-            await interaction.followup.send(embed=embed, view=ControlPanelView(), ephemeral=False)
-        except Exception:
-            pass
+        await send_interaction_response(interaction, embed, view=ControlPanelView())
 
     @bot.tree.error
     async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
@@ -428,33 +440,18 @@ def create_bot_instance(bot_info: dict):
                 description=f"Command execute karte waqt error aaya: `{str(error)}`",
                 color=discord.Color.gold()
             )
-        try:
-            if interaction.response.is_done():
-                await interaction.followup.send(embed=embed, ephemeral=False)
-            else:
-                await interaction.response.send_message(embed=embed, ephemeral=False)
-        except Exception:
-            pass
+        await send_interaction_response(interaction, embed)
 
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
     async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=False)
-        except Exception:
-            pass
-
         if not check_user_access(interaction):
             embed = create_embed(
                 title="⛔ Permission Denied",
                 description="Is command ko chalane ke liye aapke paas **`BOT ACCESS`** Role ya Administrator permission honi chahiye.",
                 color=discord.Color.red()
             )
-            try:
-                await interaction.followup.send(embed=embed, ephemeral=False)
-            except Exception:
-                pass
+            await send_interaction_response(interaction, embed)
             return
 
         target_channel = None
@@ -474,20 +471,14 @@ def create_bot_instance(bot_info: dict):
                 description="Kripya pehle kisi Voice Channel me join hon ya command me `channel` select karein.",
                 color=discord.Color.red()
             )
-            try:
-                await interaction.followup.send(embed=embed, ephemeral=False)
-            except Exception:
-                pass
+            await send_interaction_response(interaction, embed)
             return
 
         try:
             guild = interaction.guild
             if not guild:
                 embed = create_embed(title="❌ Server Only", description="Is command ko server me chalayein.", color=discord.Color.red())
-                try:
-                    await interaction.followup.send(embed=embed, ephemeral=False)
-                except Exception:
-                    pass
+                await send_interaction_response(interaction, embed)
                 return
 
             voice_client = guild.voice_client
@@ -499,10 +490,7 @@ def create_bot_instance(bot_info: dict):
                         description=f"Bot already **{target_channel.mention}** me connected hai (24/7 Mode).",
                         color=discord.Color.blue()
                     )
-                    try:
-                        await interaction.followup.send(embed=embed, ephemeral=False)
-                    except Exception:
-                        pass
+                    await send_interaction_response(interaction, embed)
                     return
                 else:
                     await asyncio.wait_for(voice_client.move_to(target_channel), timeout=8.0)
@@ -516,10 +504,7 @@ def create_bot_instance(bot_info: dict):
                 description=f"Bot successfully **{target_channel.mention}** me join ho gaya hai aur **24/7** connected rahega!",
                 color=discord.Color.green()
             )
-            try:
-                await interaction.followup.send(embed=embed, ephemeral=False)
-            except Exception:
-                pass
+            await send_interaction_response(interaction, embed)
 
             if bot.user and ("INTERNAL" in bot.user.name.upper() or bot.user.id == 1548212884843274240):
                 asyncio.create_task(handle_vc_welcome_sequence(guild, target_channel))
@@ -530,22 +515,13 @@ def create_bot_instance(bot_info: dict):
                 description=f"Voice channel join karte waqt error aaya: `{str(e)}`\nMake sure bot has `Connect` & `Speak` permissions in VC!",
                 color=discord.Color.red()
             )
-            try:
-                await interaction.followup.send(embed=embed, ephemeral=False)
-            except Exception:
-                pass
+            await send_interaction_response(interaction, embed)
 
     @bot.tree.command(name="speakwelcome", description=f"Manually trigger Girl Voice Welcome Dialogue in VC")
     async def speakwelcome(interaction: discord.Interaction):
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=False)
-        except Exception:
-            pass
-
         if not check_user_access(interaction):
             embed = create_embed(title="⛔ Permission Denied", description="Is command ke liye **`BOT ACCESS`** Role ya Admin permission honi chahiye.", color=discord.Color.red())
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
             return
 
         guild = interaction.guild
@@ -560,27 +536,21 @@ def create_bot_instance(bot_info: dict):
                 description=f"Teeno bots **{vc.channel.mention}** me 3-step sequential dialogue bol rahe hain!",
                 color=discord.Color.green()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
             asyncio.create_task(handle_vc_welcome_sequence(guild, vc.channel))
         else:
             embed = create_embed(title="❌ Not Connected in VC", description="Pehle bot ko `/joinvc` se Voice Channel me join karayein.", color=discord.Color.red())
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
 
     @bot.tree.command(name="leavevc", description=f"Disconnect {name} from Voice Channel")
     async def leavevc(interaction: discord.Interaction):
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=False)
-        except Exception:
-            pass
-
         if not check_user_access(interaction):
             embed = create_embed(
                 title="⛔ Permission Denied",
                 description="Is command ko chalane ke liye aapke paas **`BOT ACCESS`** Role ya Administrator permission honi chahiye.",
                 color=discord.Color.red()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
             return
 
         guild = interaction.guild
@@ -596,26 +566,20 @@ def create_bot_instance(bot_info: dict):
                 description=f"Bot **{vc_name}** Voice Channel se disconnect ho gaya hai.",
                 color=discord.Color.gold()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
         else:
             embed = create_embed(
                 title="❌ Not in Voice Channel",
                 description="Bot filhal kisi Voice Channel me connected nahi hai.",
                 color=discord.Color.red()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
 
     @bot.tree.command(name="speakowner", description="Play Owner Surveillance Announcement audio in VC")
     async def speakowner(interaction: discord.Interaction):
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=False)
-        except Exception:
-            pass
-
         if not check_user_access(interaction):
             embed = create_embed(title="⛔ Permission Denied", description="Is command ke liye **`BOT ACCESS`** Role ya Admin permission honi chahiye.", color=discord.Color.red())
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
             return
 
         guild = interaction.guild
@@ -629,11 +593,11 @@ def create_bot_instance(bot_info: dict):
                 description=f"**X CHEAT AUTH SYSTEM** bot **{vc.channel.mention}** me Owner Surveillance announcement play kar raha hai!",
                 color=discord.Color.green()
             )
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
             asyncio.create_task(play_audio_for_bot_keyword("AUTH", guild, "audio_owner.mp3", target_channel=vc.channel))
         else:
             embed = create_embed(title="❌ Not Connected in VC", description="Pehle bot ko `/joinvc` se Voice Channel me join karayein.", color=discord.Color.red())
-            await interaction.followup.send(embed=embed, ephemeral=False)
+            await send_interaction_response(interaction, embed)
 
     return bot, token
 
