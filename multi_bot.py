@@ -225,6 +225,13 @@ async def play_audio_for_bot_keyword(keyword: str, guild: discord.Guild, audio_f
         else:
             logger.warning(f"Bot {bot_inst.user} is not in VC for guild {guild.name}")
             return
+    elif target_channel and vc.channel and vc.channel.id != target_channel.id:
+        try:
+            logger.info(f"[{bot_inst.user.name}] Moving to target VC: {target_channel.name}")
+            await vc.move_to(target_channel)
+            bot_inst.saved_vc_id = target_channel.id
+        except Exception as e:
+            logger.warning(f"[{bot_inst.user.name}] Could not move to VC: {e}")
 
     try:
         logger.info(f"[{bot_inst.user.name}] Playing audio file: {audio_file}")
@@ -281,6 +288,16 @@ async def vc_auto_reconnect_loop(bot, bot_name: str):
                         await channel.connect(reconnect=True, self_deaf=False)
             except Exception as ex:
                 logger.debug(f"[{bot_name}] VC Auto-Reconnect error: {ex}")
+        else:
+            for g in bot.guilds:
+                if g.voice_channels and (not g.voice_client or not g.voice_client.is_connected()):
+                    channel = g.voice_channels[0]
+                    bot.saved_vc_id = channel.id
+                    try:
+                        logger.info(f"[{bot_name}] Auto-joining first available VC: {channel.name}")
+                        await channel.connect(reconnect=True, self_deaf=False)
+                    except Exception as ex:
+                        logger.warning(f"[{bot_name}] Auto VC connect error: {ex}")
 
 
 def create_bot_instance(bot_info: dict):
@@ -465,6 +482,9 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
             if isinstance(interaction.user, discord.Member) and interaction.user.voice:
                 target_channel = interaction.user.voice.channel
 
+        if not target_channel and interaction.guild and interaction.guild.voice_channels:
+            target_channel = interaction.guild.voice_channels[0]
+
         if not target_channel:
             embed = create_embed(
                 title="❌ Voice Channel Not Found",
@@ -528,16 +548,24 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
         if not guild:
             return
 
+        target_ch = None
         vc = guild.voice_client
         if vc and vc.channel:
+            target_ch = vc.channel
+        elif isinstance(interaction.user, discord.Member) and interaction.user.voice:
+            target_ch = interaction.user.voice.channel
+        elif guild.voice_channels:
+            target_ch = guild.voice_channels[0]
+
+        if target_ch:
             bot_display_name = interaction.client.user.name if interaction.client.user else name
             embed = create_embed(
                 title="🎙️ Girl Voice Dialogue Started",
-                description=f"Teeno bots **{vc.channel.mention}** me 3-step sequential dialogue bol rahe hain!",
+                description=f"Teeno bots **{target_ch.mention}** me 3-step sequential dialogue bol rahe hain!",
                 color=discord.Color.green()
             )
             await send_interaction_response(interaction, embed)
-            asyncio.create_task(handle_vc_welcome_sequence(guild, vc.channel))
+            asyncio.create_task(handle_vc_welcome_sequence(guild, target_ch))
         else:
             embed = create_embed(title="❌ Not Connected in VC", description="Pehle bot ko `/joinvc` se Voice Channel me join karayein.", color=discord.Color.red())
             await send_interaction_response(interaction, embed)
@@ -586,15 +614,23 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
         if not guild:
             return
 
+        target_ch = None
         vc = guild.voice_client
         if vc and vc.channel:
+            target_ch = vc.channel
+        elif isinstance(interaction.user, discord.Member) and interaction.user.voice:
+            target_ch = interaction.user.voice.channel
+        elif guild.voice_channels:
+            target_ch = guild.voice_channels[0]
+
+        if target_ch:
             embed = create_embed(
                 title="🛡️ Owner Detected Audio Started",
-                description=f"**X CHEAT AUTH SYSTEM** bot **{vc.channel.mention}** me Owner Surveillance announcement play kar raha hai!",
+                description=f"**X CHEAT AUTH SYSTEM** bot **{target_ch.mention}** me Owner Surveillance announcement play kar raha hai!",
                 color=discord.Color.green()
             )
             await send_interaction_response(interaction, embed)
-            asyncio.create_task(play_audio_for_bot_keyword("AUTH", guild, "audio_owner.mp3", target_channel=vc.channel))
+            asyncio.create_task(play_audio_for_bot_keyword("AUTH", guild, "audio_owner.mp3", target_channel=target_ch))
         else:
             embed = create_embed(title="❌ Not Connected in VC", description="Pehle bot ko `/joinvc` se Voice Channel me join karayein.", color=discord.Color.red())
             await send_interaction_response(interaction, embed)
