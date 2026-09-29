@@ -435,6 +435,11 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
     @bot.tree.command(name="panel", description=f"Open Control Panel for {name}")
     @has_bot_access()
     async def panel(interaction: discord.Interaction):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         embed = create_embed(
             title=f"🛠️ {name} Control Panel",
             description="Niche diye gaye buttons se direct keys create karein:",
@@ -462,6 +467,11 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
     @bot.tree.command(name="joinvc", description=f"Make {name} join a Voice Channel 24/7")
     @discord.app_commands.describe(channel="Select Voice Channel (Optional if you are currently sitting in VC)")
     async def joinvc(interaction: discord.Interaction, channel: Optional[discord.VoiceChannel] = None):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         if not check_user_access(interaction):
             embed = create_embed(
                 title="⛔ Permission Denied",
@@ -539,6 +549,11 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
 
     @bot.tree.command(name="speakwelcome", description=f"Manually trigger Girl Voice Welcome Dialogue in VC")
     async def speakwelcome(interaction: discord.Interaction):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         if not check_user_access(interaction):
             embed = create_embed(title="⛔ Permission Denied", description="Is command ke liye **`BOT ACCESS`** Role ya Admin permission honi chahiye.", color=discord.Color.red())
             await send_interaction_response(interaction, embed)
@@ -572,6 +587,11 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
 
     @bot.tree.command(name="leavevc", description=f"Disconnect {name} from Voice Channel")
     async def leavevc(interaction: discord.Interaction):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         if not check_user_access(interaction):
             embed = create_embed(
                 title="⛔ Permission Denied",
@@ -605,6 +625,11 @@ async def send_interaction_response(interaction: discord.Interaction, embed: dis
 
     @bot.tree.command(name="speakowner", description="Play Owner Surveillance Announcement audio in VC")
     async def speakowner(interaction: discord.Interaction):
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=False)
+        except Exception:
+            pass
         if not check_user_access(interaction):
             embed = create_embed(title="⛔ Permission Denied", description="Is command ke liye **`BOT ACCESS`** Role ya Admin permission honi chahiye.", color=discord.Color.red())
             await send_interaction_response(interaction, embed)
